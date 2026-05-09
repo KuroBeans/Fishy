@@ -1016,7 +1016,7 @@ comp = g.actshell
 vic = params[0]
 
 home.scp("/root/fishy", vic, comp)
-home.scp("/lib/metaxploit.so", "/lib", comp)
+home.scp("/root/fishy/metaxploit.so", "/lib", comp)
 end function
 /////////////////////////end jump//////////////////////////////
 
