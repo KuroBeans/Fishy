@@ -1,0 +1,1153 @@
+/////////////////////////fish6.0/////////////////////////////
+
+Load_Lib = function(path)
+    pathList = path.split("/")
+    lib = pathList[-1]
+    if lib == "metaxploit.so" then
+        meta = include_lib(path)
+        if not meta then
+            print("<color=yellow>"+"Error: loadlib: unable to find metaxploit.so file at: "+path)
+            return
+        end if
+        gco.meta = meta
+        print ("<color=green>"+"gco.meta has been set")
+        return
+    end if
+    if lib == "crypto.so" then
+        crypto = include_lib(path)
+        if not crypto then
+            print("<color=yellow>"+"Error: loadlib: unable to find crypto.so file at: "+path)
+            return
+        end if
+        gco.crypto = crypto
+        print("<color=green>"+"gco.crypto has been set")
+        return
+    end if
+    print("<color=yellow>" + "unable to locate lib file at: "+path)
+    return
+end function
+
+
+gco = get_custom_object
+gco.rootshell = null
+if params.len > 0 and params[-1] == "-n" then 
+	gco.mx = null
+	Load_Lib("/lib/metaxploit.so")
+end if
+
+Cor = {}
+Cor.Random = function()
+		color_list = []
+		for value in self.values
+			color_list.push(value)
+		end for
+		color_list.pull 
+		color_list.shuffle
+		return color_list.pop
+end function
+
+cor = new Cor
+cor.moon = "<color=#F6F1D5>"
+Red = "<color=#780606>"
+cor.blu = "<color=#003AFF>" 
+cor.green = "<color=#26E048FF>" 
+cor.pink = "<color=#FF13F0>"
+cor.cop = "<color=#B87333>"
+cor.silver = "<color=#C0C0C0>"
+cor.orang = "<color=#FF8701>"
+cor.white = "<color=#FFFFFF>"
+cor.purple = "<color=#D700FF>"
+cap = "</color>" 
+////////////////globals////////////////
+menu = true
+g = get_custom_object
+g.actshell = null
+g.mx = include_lib("/lib/metaxploit.so")
+g.rootShell = null
+g.me = get_shell.host_computer
+f = {}
+f.shell = []
+f.actmem = null
+f.actval = null
+f.actindex = null
+f.actshells = null
+f.net = null
+menu = true
+f.libdump = null
+ip = get_shell.host_computer.public_ip
+
+g.ip = null
+g.port = null
+g.bip = null
+g.net = null
+g.libdump = null
+g.cx = include_lib("/lib/crypto.so")
+
+extract_label = function(text)
+    if text == null then return null end if
+    bs = text.indexOf("<b>")
+    be = text.indexOf("</b>")
+    if bs == null or be == null or be <= bs then return null end if
+    return text[bs + 3 : be]
+end function
+
+///////////////////// Start Nmap ////////////////////
+nmap = function
+// ============================================
+//   NMAP - Enhanced Port Scanner
+//   GreyScript | Grey Hack Terminal
+//   v1.2
+// ============================================
+
+// ── Colors ───────────────────────────────────
+Cor = {}
+cor = new Cor
+cor.moon   = "<color=#F6F1D5>"
+cor.red    = "<color=#780606>"
+cor.green  = "<color=#26E048FF>"
+cor.silver = "<color=#C0C0C0>"
+cor.orang  = "<color=#FF8701>"
+cor.white  = "<color=#FFFFFF>"
+cor.purple = "<color=#D700FF>"
+cor.cop    = "<color=#B87333>"
+cap = "</color>"
+
+// ── Common ports ─────────────────────────────
+COMMON_PORTS = [21, 22, 25, 80, 1222, 1542, 3306, 3307]
+
+// ── Helpers ──────────────────────────────────
+
+divider = function()
+    print(cor.silver + "  +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+" + cap)
+end function
+
+pad_right = function(s, width)
+    s = "" + s
+    while s.len < width
+        s = s + " "
+    end while
+    return s
+end function
+
+// ── Banner ───────────────────────────────────
+
+banner = function()
+    print("")
+    print(cor.green + "  +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+" + cap)
+    print(cor.green + "  |                                           |" + cap)
+    print(cor.green + "  |    NMAP  -  Enhanced Network Scanner      |" + cap)
+    print(cor.green + "  |                                           |" + cap)
+    print(cor.green + "  +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+" + cap)
+    print("")
+    print(cor.silver + "  FishScript  |  v1.2" + cap)
+    divider()
+end function
+
+// ── Usage ────────────────────────────────────
+
+usage = function()
+    print(cor.white  + "  Usage:" + cap)
+    print(cor.moon   + "    nmap <ip>           " + cap + cor.silver + "— standard scan" + cap)
+    print(cor.moon   + "    nmap <ip> -o        " + cap + cor.silver + "— open ports only (skip empty hosts)" + cap)
+    print(cor.moon   + "    nmap <ip> -w        " + cap + cor.silver + "— whois lookup + scan" + cap)
+    print(cor.moon   + "    nmap <ip> -a        " + cap + cor.silver + "— all: full scan + whois" + cap)
+    print(cor.moon   + "    nmap <ip> -v        " + cap + cor.silver + "— verbose (show LAN IPs with no open ports)" + cap)
+    print(cor.moon   + "    nmap --help         " + cap + cor.silver + "— show this menu" + cap)
+    print("")
+    print(cor.silver + "  Flags can be combined: " + cap + cor.moon + "nmap <ip> -o -w" + cap)
+    divider()
+end function
+
+// ── Service Name Lookup ──────────────────────
+
+service_name = function(port_num)
+    services = { "21":   "ftp","22":   "ssh", "25":   "smtp", "80":   "http","1222": "rshell","1542": "repository", "3306": "mysql","3307": "mysql-alt"}
+          
+
+    key = "" + port_num
+    if services.hasIndex(key) then return services[key]
+    return "unknown"
+end function
+
+// ── Scan Device ──────────────────────────────
+
+scan_device = function(router, ip, flag_open_only, flag_verbose)
+    ports = router.device_ports(ip)
+    if ports == null then ports = []
+
+    // Build open port lookup map
+    open_map = {}
+    for p in ports
+        open_map["" + p.port_number] = p
+    end for
+
+    // Host header
+    print("")
+    print(cor.white + "  Host: " + cap + cor.orang + ip + cap)
+
+    // No open ports — always show, even with -o
+    if ports.len == 0 then
+        print(cor.orang + "  [!] No open ports." + cap)
+        return
+    end if
+
+    // -o: skip hosts with no open ports from full detail view
+    if flag_open_only and ports.len == 0 then return
+
+    print(cor.silver + "  " + ports.len + " open port(s)" + cap)
+    print("")
+
+    // Column headers
+    print(cor.purple +
+          pad_right("  PORT", 10) +
+          pad_right("STATE", 10) +
+          pad_right("SERVICE", 14) +
+          "VERSION" + cap)
+    print(cor.silver + "  ----------------------------------------" + cap)
+
+    if flag_verbose then
+        // Check COMMON_PORTS first, print only open ones
+        shown = {}
+        for portNum in COMMON_PORTS
+            key = "" + portNum
+            svc = service_name(portNum)
+            if open_map.hasIndex(key) then
+                p = open_map[key]
+                info = router.port_info(p)
+                ver = ""
+                if info != null then ver = info
+                line = pad_right("  " + portNum + "/tcp", 10) +
+                       pad_right("open", 10) +
+                       pad_right(svc, 14)
+                print(cor.green + line + cap + cor.cop + ver + cap)
+            end if
+            shown[key] = true
+        end for
+        // Any open ports not in COMMON_PORTS
+        for p in ports
+            key = "" + p.port_number
+            if not shown.hasIndex(key) then
+                svc = service_name(p.port_number)
+                info = router.port_info(p)
+                ver = ""
+                if info != null then ver = info
+                line = pad_right("  " + p.port_number + "/tcp", 10) +
+                       pad_right("open", 10) +
+                       pad_right(svc, 14)
+                print(cor.green + line + cap + cor.cop + ver + cap)
+            end if
+        end for
+    else
+        // Normal: open ports only
+        for p in ports
+            svc = service_name(p.port_number)
+            info = router.port_info(p)
+            ver = ""
+            if info != null then ver = info
+            line = pad_right("  " + p.port_number + "/tcp", 10) +
+                   pad_right("open", 10) +
+                   pad_right(svc, 14)
+            print(cor.green + line + cap + cor.cop + ver + cap)
+        end for
+    end if
+end function
+
+// ── Entry Point ──────────────────────────────
+
+if params.len == 0 then
+    banner()
+    usage()
+    return
+end if
+
+target       = ""
+flag_open    = false
+flag_whois   = false
+flag_all     = false
+flag_verbose = false
+
+for p in params
+    if p == "--help" or p == "-h" then
+        banner()
+        usage()
+        return
+    else if p == "-o" then
+        flag_open = true
+    else if p == "-w" then
+        flag_whois = true
+    else if p == "-a" then
+        flag_all   = true
+        flag_whois = true
+    else if p == "-v" then
+        flag_verbose = true
+    else if p[0] != "-" then
+        target = p
+    end if
+end for
+
+if target == "" then
+    banner()
+    print(cor.red + "  Error: no target IP provided." + cap)
+    print("")
+    usage()
+    return
+end if
+
+if not is_valid_ip(target) then
+    banner()
+    print(cor.red + "  Error: '" + target + "' is not a valid IP address." + cap)
+    print("")
+    usage()
+    return
+end if
+
+// ── Run Scan ─────────────────────────────────
+
+clear_screen
+banner()
+
+print(cor.white + "  Target : " + cap + cor.orang + target + cap)
+
+flags_str = ""
+if flag_open    then flags_str = flags_str + "-o "
+if flag_whois   then flags_str = flags_str + "-w "
+if flag_all     then flags_str = flags_str + "-a "
+if flag_verbose then flags_str = flags_str + "-v "
+if flags_str == "" then flags_str = "none"
+print(cor.silver + "  Flags  : " + cap + cor.moon + flags_str + cap)
+divider()
+
+// Whois block
+if flag_whois or flag_all then
+    print(cor.purple + "  [ WHOIS ]" + cap)
+    print("")
+    host_info = whois(target)
+    if host_info then
+        print(cor.moon + "  " + host_info + cap)
+    else
+        print(cor.silver + "  No whois data found." + cap)
+    end if
+    divider()
+end if
+
+// Get router
+router = get_router(target)
+
+if router == null then
+    print(cor.red + "  Could not reach router at " + target + cap)
+    print(cor.silver + "  Host may be offline or unreachable." + cap)
+    print("")
+    return
+end if
+
+print(cor.white + "  Router kernel : " + cap + cor.cop + router.kernel_version + cap)
+divider()
+
+// Get LAN devices
+devices = router.devices_lan_ip
+
+if devices == null or devices.len == 0 then
+    print(cor.silver + "  No devices discovered on network." + cap)
+    print("")
+    return
+end if
+
+print(cor.white + "  Discovered " + cap + cor.orang + devices.len + cap + cor.white + " device(s)" + cap)
+
+// Find exposed hosts
+exposed_hosts = []
+for ip in devices
+    ports = router.device_ports(ip)
+    if ports == null or ports.len == 0 then
+        exposed_hosts.push(ip)
+    end if
+end for
+
+if exposed_hosts.len > 0 then
+    print("")
+    print(cor.orang + "  [!] Hosts with no open ports (" + exposed_hosts.len + "):" + cap)
+    for h in exposed_hosts
+        print(cor.orang + "      - " + h + cap)
+    end for
+end if
+divider()
+
+// Scan each device
+total_open = 0
+for ip in devices
+    ports = router.device_ports(ip)
+    if ports != null then total_open = total_open + ports.len
+    scan_device(router, ip, flag_open, flag_verbose)
+    divider()
+end for
+
+// Summary
+print("")
+print(cor.white  + "  Scan complete." + cap)
+print(cor.green  + "  Open    : " + total_open + cap)
+print(cor.silver + "  Devices : " + devices.len + cap)
+if exposed_hosts.len > 0 then
+    print(cor.orang + "  Exposed : " + exposed_hosts.len + cap)
+end if
+print("")
+end function
+/////////////////////// end Nmap ////////////////////////
+/////////////////////// start es ////////////////////////
+exploit =function
+if params[0] == null or params.len < 2 then
+	print("Usage||> es [ip] [port]")
+	return
+end if
+
+f.shell = []
+f.actmem = null
+f.actval = null
+f.actindex = null
+f.actshells = null
+f.actshells = null
+f.libdump
+g.ip = params[0]
+g.port = params[1].to_int
+g.bip = user_input(cor.green+"Lan or Pw Change? ||> ")
+f.net = g.mx.net_use(g.ip, g.port)
+if f.net == null then
+	print(Red + "Netsession Not Accquired....")
+	return
+end if
+
+f.libdump = f.net.dump_lib
+if f.libdump == null then 
+	user_input(Red + "Unable to Dump Lib")
+	return
+end if
+
+memlist = g.mx.scan(f.libdump)
+if memlist == null or memlist.len == 0 then
+	print(Red + "No Scan Results...")
+	return
+end if
+user_input("<color=#007413FF>debug||-Scan entries: " + memlist.len + "</color>")
+i = 1
+for mem in memlist
+	scanresults = g.mx.scan_address(f.libdump, mem).split("Unsafe check: ")
+	for results in scanresults
+		if results == scanresults[0] then continue
+		val = results[results.indexOf("<b>")+3:results.indexOf("</b>")]
+		print(char(10) + "<color=#FFE5B4>" + "<b>"+mem + " " + val)
+		obj = f.libdump.overflow(mem, val, g.bip)
+		if typeof (obj) == "shell" then print("<b>object obtainable: "+cor.green+obj+char(10))
+		if typeof(obj) == "computer" then print("<b>object obtainable: "+"<color=#FF8701>"+obj+char(10))
+		if typeof(obj) == "file" then print("<b>object obtainable: "+"<color=#D700FF>"+obj+ " ==>" + obj.name+ char(10))
+		i = i +1
+		if obj then 
+			f.shell.push([mem, val, obj])
+		end if
+	end for
+end for
+print("<color=#007413FF>|-Available targets: " + f.shell.len + "</color>")
+print("<color=#FF00E2FF>[i] New target ready.</color> " + g.ip + " || " + g.port)
+end function
+//////////////////////// end of es ////////////////////
+//////////////////////// Start of Targets////////////////////
+targ = function
+if f.shell == null or f.shell.len == 0 then
+	print("<color=#ff0000>No Available Targets")
+	return
+end if
+print(cor.green + "<size=125%><----- Available targets -----></size></color>")
+idx = 0
+
+for entry in f.shell
+	mem = entry[0]
+	val = entry[1]
+	obj = entry[2]
+	print("<color=#007413FF>" + idx + "</color> " + " | <color=#55AAFF>" + mem + "</color> | <color=#FFA100FF>" + val + "<color=#FF00E2FF>" + " | " + obj + " | " + "</color>")
+        idx = idx + 1
+    end for
+sel = user_input("<color=#FF00E2FF>Select target index: </color>")
+si = sel.to_int
+
+if si >= 0 and si < f.shell then
+	f.actindex = si
+	f.actmem = f.shell[si][0]
+	f.actval = f.shell[si][1]
+	g.actshell = f.shell[si][2]
+	
+	if typeof(g.actshell) == "shell" then
+		activeObj = "Shell"
+		f.ip = g.actshell.host_computer.public_ip
+		f.lan = g.actshell.host_computer.local_ip
+		else if typeof(g.actshell) == "computer" then
+			activeObj = "Computer"
+			f.ip = g.actshell.public_ip
+			f.lan = g.actshell.local_ip
+			
+
+
+
+        print("[i] <color=#FF00E2FF><size=125%>Selected|> </size></color> <color=#55AAFF>" + activeObj + " | " + f.actmem + "</color> | <color=#FFA100FF>" + f.actval + " | " +  "<color=#FF00E2FF>" + f.ip + " | " + f.lan + " | "  + "</color>")
+		else
+        print("[!] Invalid selection")
+    end if
+end function
+//////////////////////// end of targets /////////////////////
+//////////////////////// start Mail_dump ///////////////////////
+mail_dump = function
+    comp = g.actshell.host_computer
+    if comp == null then
+        print(Red + "No Active Obj...")
+        return
+    end if
+
+    if g.cx == null then
+        print(Red + "CRYPTO NULL")
+        return
+    end if
+
+    home = comp.File("/home")
+    folders = home.get_folders
+
+    for f in folders
+        t = f.name
+        p = "/home/" + t + "/Config"
+        mails = comp.File(p)
+        if mails == null then continue
+
+        cont = mails.get_files
+        if cont == null or cont.len == 0 then continue
+
+        // ── Loop over every file in the Config folder ──
+        for file in cont
+            content = file.get_content
+            if content == null or content == "" then continue
+
+            lines = split(content, "\n")
+
+            for line in lines
+                if line == "" then continue
+
+                parts = split(line, ":")
+                if parts.len < 2 then
+                    print("Skipping invalid line: " + line)
+                    continue
+                end if
+
+                user = parts[0]
+                encpass = parts[1]
+
+                if encpass == null or encpass == "" then
+                    print("Bad hash in file: " + file.name)
+                    continue
+                end if
+
+                pw = g.cx.decipher(encpass)
+
+                if pw == null then
+                    print("Failed decrypt: " + encpass)
+                    continue
+                end if
+
+                if user == "root" then
+                    col = Red
+                else
+                    col = cor.Random
+                end if
+
+                print(format_columns(col + "User||> " + user + cor.Random + " | Pass||: " + pw))
+            end for
+        end for
+    end for
+end function
+//////////////////// end of Mail_Dump ///////////////////
+//////////////////// start of Dump ////////////////////
+dump = function 
+if not g.actshell then
+    print("[i]Computer/Shell not available")
+    return
+end if
+if typeof(g.actshell) == "computer" then
+    comp = g.actshell
+else
+    comp = g.actshell.host_computer
+end if
+passwdFile = comp.File("/etc/passwd")
+if not passwdFile then
+    print("Permission Denied")
+    return
+end if
+
+if passwdFile != null then
+    content = passwdFile.get_content
+end if
+if not content then
+    print("/etc/passwd Not Found")
+    return
+end if
+
+if content != null then
+    print("--- /etc/passwd ---")
+    print(char(10) + content)
+end if			
+if g.cx != null then
+    print("--- Deciphered ---")
+end if
+for line in content.split("\n")
+    if line.len > 0 then
+        parts = line.split(":")
+        username = parts[0]
+        hash = parts[1]
+        
+        if hash != "" and hash != "x" and hash != "*" then
+            pw = g.cx.decipher(hash)
+            col = "<color=#FFAA00FF>"
+            if username == "root" then col = "<color=#FF0000FF>" end if
+            print(col + "User: " + username + " | Pass: " + pw)
+        else
+            print("User: " + username + " | Pass: <none>")
+        end if
+end if
+    end for
+end function
+/////////////////// start ls ////////////////////
+ls = function()
+    ValidateInput = function(input)
+        return (input == "-la" or input == "-l" or input == "-a")
+    end function 
+
+    ParamsValid = function(params)
+        if params.len > 3 then return false 
+        for p in params                               
+            if p.indexOf("-") != null and not ValidateInput(p) then return false
+        end for                                     
+        return true                                
+    end function
+    
+    if not ParamsValid(params) then
+        print(command_info("ls_usage"))
+        return
+    end if
+    
+    
+computer = g.actshell.host_computer
+if typeof(g.actshell) == "computer" then
+	computer = g.actshell
+end if
+
+
+
+    
+    folderPath = current_path
+    if params and params[params.len - 1].indexOf("-") == null then
+        folderPath = get_abs_path(params[params.len - 1])
+    end if
+    
+    folder = computer.File(folderPath)
+    if folder == null then
+        print("ls: No such file or directory")
+        return
+    end if
+    
+    if not folder.has_permission("r") then
+        print("ls: permission denied")
+        return
+    end if
+    
+    showHide = 0
+    if params and params[0].indexOf("a") != null then
+        showHide = 1
+    end if
+
+    showDetails = 0
+    if params and params[0].indexOf("l") != null then
+        showDetails = 1
+    end if
+
+    subFiles = folder.get_folders + folder.get_files
+    output = ""
+    for subFile in subFiles
+        nameFile = subFile.name
+        permission = subFile.permissions
+        owner = subFile.owner
+        size = subFile.size
+        group = subFile.group
+
+        if showHide or nameFile.indexOf(".") != 0 then
+            if output.len > 0 then 
+                output = output + "\n"
+            end if
+            if showDetails then
+                output = output + permission + " " + owner + " " + group + " " + size + " 00:00 " + nameFile
+                if subFile.is_symlink then output = output + "-->" + subFile.path(true)
+            else
+                output = output + nameFile
+            end if
+        end if
+    end for
+    
+    print(format_columns(output))
+end function
+/////////////////////// end of LS ////////////////////////
+/////////////////////// start of rm //////////////////////
+rm = function()
+
+if params.len < 1 or params.len > 2 or params[0] == "-h" or params[0] == "--help" then return (command_info("rm_usage"))
+comp =  g.actshell
+
+pathFile = get_abs_path(params[0])
+isRecursive = 0
+if params[0] == "-r" then
+    if params.len == 1 then return (command_info("rm_usage"))
+    isRecursive = 1
+    pathFile = params[1]
+end if
+
+file = comp.File(pathFile)
+
+if file == null then return("rm: file not found: " + pathFile)
+if not file.has_permission("w") then return ("rm: permission denied")
+
+if file.is_folder == 1 and isRecursive == 0 and file.is_symlink == 0 then
+    print("rm: " + file.name + " is a directory")
+else
+    output = file.delete
+    if output.len != 0 then 
+	print(Red+"File Removed")
+end if
+end function
+//////////////////////// end of rm /////////////////////
+//////////////////////// start of touch ///////////////////////
+Touch = function()
+    if params.len != 1 or params[0] == "-h" or params[0] == "--help" then
+        print(command_info("touch_usage"))
+        return
+    end if
+
+    pathFile = get_abs_path(params[0])
+    pathParent = parent_path(pathFile)
+    computer = g.actshell
+    if g.actshell == null then
+        computer = get_shell.host_computer
+
+	else
+	if typeof(g.actshell) == "computer" then
+	computer = g.actshell
+
+    end if
+
+    if pathParent == pathFile then
+        pathParent = current_path
+    end if
+
+    parent = computer.File(pathParent)
+
+    if not parent then
+        print("touch: " + pathParent + " not found")
+        return
+    end if
+    if not parent.has_permission("w") then
+        print("touch: permission denied")
+        return
+    end if
+
+    arrayPath = pathFile.split("/")
+    output = computer.touch(parent.path, arrayPath[arrayPath.len - 1])
+    if output and output != 1 then print(output)
+end function
+/////////////////// end of touch ////////////////////
+/////////////////// start of MV /////////////////////
+mv = function()
+    Basename = function(p)
+        if p == "/" then return "/"
+        if p.len > 1 and p[p.len-1:p.len] == "/" then
+            p = p[0:p.len-1] 
+        end if
+        parts = p.split("/")
+        return parts[parts.len-1]
+    end function
+
+    if params.len != 2 then
+        print(command_info("mv_usage"))
+        return
+    end if
+
+    origFile = get_abs_path(params[0])
+    destFolder = get_abs_path(params[1])
+
+    computer = g.actshell
+    if g.actshell == null then
+        computer = get_shell.host_computer
+    end if
+
+    file = computer.File(origFile)
+    if file == null then
+        print("mv: can't find " + origFile)
+        return
+    end if
+
+    if not file.has_permission("w") then
+        print("mv: permission denied")
+        return
+    end if
+
+    newName = ""
+    folder = computer.File(destFolder)
+    if folder == null then
+        // Check if the user wants to rename the file.
+        pathParent = parent_path(destFolder)
+                
+        if pathParent == destFolder then            
+            newName = destFolder
+            destFolder = file.parent.path        
+            output = file.move(destFolder, newName)
+            if output and output != 1 then print(output)
+            return
+        else
+            folder = computer.File(pathParent)
+            newName = Basename(destFolder)
+            if folder == null then                
+                print("mv: can't move file. " + destFolder + " doesn't exist.")
+                return
+            end if            
+        end if
+    end if
+
+    if folder != null then
+        // Check if trying to move the file onto itself. Ignore.
+        if folder.parent != null and file.parent.path == folder.parent.path and file.name == folder.name then return
+
+        finalDest = folder.path
+            
+        if newName.len == 0 then
+            newName = file.name
+        end if
+
+        if not folder.is_folder then            
+            finalDest = file.parent.path
+            newName = folder.name
+        end if
+        
+        fileParentPath = "none"
+        folderParentPath = "none"
+        if file.parent != null then fileParentPath = file.parent.path
+        if folder.parent != null then folderParentPath = folder.parent.path
+
+        if fileParentPath == folderParentPath and finalDest == folderParentPath and newName != file.name then
+            output = file.rename(newName)
+            if output and output != 1 then print(output)
+        else
+            output = file.move(finalDest, newName)
+            if output and output != 1 then print(output)
+        end if
+    end if
+end function
+///////////////////////// end of mv ///////////////////////
+//////////////////////// start run ///////////////////////
+run = function
+shell = g.actshell
+if shell != null then
+	shell.launch(params[0])
+end if
+end function
+//////////////////////// end of run ///////////////////////
+//////////////////////// start of whoami ///////////////////////
+who = function
+if g.actshell != null then
+	print(active_user)
+end if
+end function
+/////////////////////////start scan //////////////////////////
+Scan = function()
+    print(Red + "<size=75%>Only Works LOCALLY... REMOTE is WIP</size>")
+    bIP = user_input("lanIP for BOUNCE/PASS Change? ||> ")
+
+    if g.mx == null then
+        print("Metaxploit not loaded — run Load_Lib first")
+        return
+    end if
+
+    libPath = params[0]
+    metalib = g.mx.load(libPath)
+    if metalib == null then
+        print("Lib not found: " + libPath)
+        return
+    end if
+
+    memlist = g.mx.scan(metalib)
+    if memlist == null or memlist.len == 0 then
+        print("No scan results")
+        return
+    end if
+
+    print("<color=#007413FF>|- Scan entries: " + memlist.len + "</color>")
+    f.scanlist = []
+    i = 1
+
+    for mem in memlist
+        scanResults = g.mx.scan_address(metalib, mem).split("Unsafe check: ")
+        for result in scanResults
+            if result == scanResults[0] then continue
+            value = result.trim()
+            print(char(10) + "<color=#FFE5B4>[" + i + "] " + mem + "  " + value + "</color>")
+            obj = metalib.overflow(mem, value, bIP)
+            if typeof(obj) == "shell" or typeof(obj) == "computer" then
+                print("Object obtainable: <color=#D700FF>" + obj + "</color>  (" + typeof(obj) + ")")
+                f.scanlist.push([mem, value, obj])
+            else if typeof(obj) == "file" then
+                print("Object obtainable: <color=#FF13F0>" + obj + " --> " + obj.name + "</color>")
+                if obj then f.shell.push([mem, value, obj])
+            end if
+            i = i + 1
+        end for
+    end for
+
+    if f.scanlist.len == 0 then
+        print("No objects obtained from overflow attempts")
+    else
+        print("<color=#007413FF>|- " + f.shell.len + " object(s) stored in scanlist</color>")
+    end if
+end function
+////////////////////////////end scan///////////////////////////
+///////////////////////////start corlog ////////////////////////
+Cor_log = function()
+    computer = g.actshell
+    if g.actshell == null then
+        computer = get_shell.host_computer
+    end if
+
+    // Create the file in /root
+    rootDir = computer.File("/root")
+    if rootDir == null or not rootDir.has_permission("w") then
+        print("cannot create file in /root (directory not found or no permission)")
+        return
+    end if
+    output = computer.touch("/root", "system.log")
+    if output and output != 1 then
+        print("create_log: failed to create system.log in /root: " + output)
+        return
+    end if
+    print("Created system.log in /root")
+
+    // Move to /var
+    varDir = computer.File("/var")
+    if varDir == null or not varDir.has_permission("w") then
+        print("create_log: cannot move to /var (directory not found or no permission)")
+        return
+    end if
+    file = computer.File("/root/system.log")
+    if file == null then
+        print("create_log: system.log not found after creation")
+        return
+    end if
+    output = file.move("/var", "system.log")
+    if output and output != 1 then
+        print("create_log: failed to move system.log to /var: " + output)
+    else
+		print(Red+"Corrupting logs...")
+        print(cor.green+"log corrupted")
+    end if
+end function
+///////////////////////end corlog ///////////////////////////////
+/////////////////// start escalate /////////////////////////////
+
+esc = function
+if g.actshell != null then
+comp = g.actshell
+else
+print(Red+"No Active OBJ")
+end if
+
+home = "/root/vector"
+remote = get_abs_path("/home/guest")
+Self = get_shell
+ 
+
+Self.scp(home, remote, comp)
+Self.scp("/root/metaxploit.so", remote, comp)
+launch(comp, "/home/guest/vector")
+
+end function
+/////////////////end es///////////////////
+////////////////start getroot ///////////////
+get_root = function
+if params < 1 then
+	print("need root passwrd")
+	return
+end if
+comp = g.actshell.host_computer
+
+get_shell.scp("/root/fishy/getroot", "/home/guest", comp)
+password=params[0]
+//src=fishy.active_shells.host_computer.touch("/home/guest","getroot.src")
+//if not src then
+	//print("unable to make src file")
+	////return
+//end if
+
+//file=fishy.active_shells.host_computer.File("/home/guest/getroot.src")
+//if not file then
+	//print("unable to find getroot.src")
+	//return
+//end if
+
+//file.set_content("password = params[0]; gco = get_custom_object; shell = get_shell(""root"",password); if shell then gco.rootShell = shell")
+
+comp=g.actshell
+//comp.build("/home/guest/getroot.src", "/home/guest")
+comp.launch("/home/guest/getroot", password)
+if g.rootShell then
+	print("Remote Root Shell Aquired")
+	g.actshell = g.rootShell
+end if
+end function
+//////////////////////////end getroot ////////////////////////////
+///////////////////////// start jump /////////////////////////////
+jump = function
+if params.len <= 0 then
+	print(Red+"Invalid Path")
+	return
+end if
+if fishy.active_shells == null then
+	print(Red+"No Active Target")
+	return
+end if
+
+home = get_shell
+comp = g.actshell
+vic = params[0]
+
+home.scp("/root/fishy", vic, comp)
+home.scp("/lib/metaxploit.so", "/lib", comp)
+end function
+/////////////////////////end jump//////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+/////////////////////// start menu (Entry Point) ////////////////////////
+
+while menu 
+if g.actshell==null then
+	activeIP = get_shell.host_computer.public_ip
+	activeLAN = get_shell.host_computer.local_ip
+	activeUser = active_user
+	print(Red+"<align=center><size=75%><<--No Active Target-->>")
+		return
+	else if g.actshell != null then
+	
+	print(cor.green+"<align=center><--Remote [" + typeof(g.actshell) +"] is Active-->")
+	activeIP = f.ip
+	activeLAN = f.lan
+	end if
+/////////////////////// start es ////////////////////////
+exploit =function
+if params[0] == null or params.len < 2 then
+	print("Usage||> es [ip] [port]")
+	return
+end if
+
+f.shell = []
+f.actmem = null
+f.actval = null
+f.actindex = null
+f.actshells = null
+f.actshells = null
+f.libdump<
+g.ip = params[0]
+g.port = params[1].to_int
+g.bip = user_input(cor.green+"Lan or Pw Change? ||> ")
+f.net = g.mx.net_use(g.ip, g.port)
+if f.net == null then
+	print(Red + "Netsession Not Accquired....")
+	return
+end if
+
+f.libdump = f.net.dump_lib
+if f.libdump == null then 
+	user_input(Red + "Unable to Dump Lib")
+	return
+end if
+
+memlist = g.mx.scan(f.libdump)
+if memlist == null or memlist.len == 0 then
+	print(Red + "No Scan Results...")
+	return
+end if
+user_input("<color=#007413FF>debug||-Scan entries: " + memlist.len + "</color>")
+i = 1
+for mem in memlist
+	scanresults = g.mx.scan_address(f.libdump, mem).split("Unsafe check: ")
+	for results in scanresults
+		if results == scanresults[0] then continue
+		val = results[results.indexOf("<b>")+3:results.indexOf("</b>")]
+		print(char(10) + "<color=#FFE5B4>" + "<b>"+mem + " " + val)
+		obj = f.libdump.overflow(mem, val, g.bip)
+		if typeof (obj) == "shell" then print("<b>object obtainable: "+cor.green+obj+char(10))
+		if typeof(obj) == "computer" then print("<b>object obtainable: "+"<color=#FF8701>"+obj+char(10))
+		if typeof(obj) == "file" then print("<b>object obtainable: "+"<color=#D700FF>"+obj+ " ==>" + obj.name+ char(10))
+		i = i +1
+		if obj then 
+			f.shell.push([mem, val, obj])
+		end if
+	end for
+end for
+print("<color=#007413FF>|-Available targets: " + f.shell.len + "</color>")
+print("<color=#FF00E2FF>[i] New target ready.</color> " + g.ip + " || " + g.port)
+end function
+//////////////////////// end of es ////////////////////
+
+end for
+end if
+
+////////////start functions/////////////
+if choice == "nmap" then
+	nmap()
+	else if choice == "es" then
+		exploit()
+	else if choice == "log" then
+		Cor_log()
+	else if choice == "rpass" then
+		esc()
+	else if choice == "getroot" then
+		get_root()
+	else if choice == "scan" then
+		Scan()
+	else if choice == "whoami" then
+		who()
+	else if choice == "ls" then
+		ls()
+	else if choice == "touch" then
+		Touch()
+	else if choice == "mv" then
+		mv()
+	else if choice == "rm" then
+		rm()
+	else if choice == "dump" then
+		dump()
+	else if choice == "targets" then
+		targ()
+	else if choice == "exit" then
+		print(" ")
+		print(cor.green+"<size=150%>GOODBYE")
+		print(" " )
+		menu = false
+	else if choice == "creds"then
+		mail_dump()
+	else
+        print(cor.Random+"Unknown. Type help for List of CMDS")
+end if
+
+	 end while
+
+
+
+
+
+
+
