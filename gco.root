@@ -1,0 +1,1 @@
+file.set_content("password = params[0]; gco = get_custom_object; shell = get_shell("root",password); if shell then gco.rootShell = shell")
